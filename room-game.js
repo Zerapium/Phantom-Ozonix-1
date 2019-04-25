@@ -129,6 +129,7 @@ class Game {
 	addBits(bits, user) {
 		if (user instanceof Player) user = Users.get(user.name);
 		Storage.addPoints(bits, user, this.room.id);
+    this.say(user.name + " gets " + bits + " bits points");
 	}
 
 	/**
@@ -170,7 +171,7 @@ class Game {
 	}
 
 	signups() {
-		this.say("Hosting a game of " + this.name + "! " + (this.freeJoin ? "(free join)" : "If you would like to play, use the command ``" + Config.commandCharacter + "join``."));
+		this.say("Starting a game of " + this.name + "! " + (this.freeJoin ? "(free join)" : "If you would like to play, use the command ``" + Config.commandCharacter + "join``."));
 		if (this.description) this.say("Description: " + this.description);
 		if (this.onSignups) this.onSignups();
 		if (this.freeJoin) this.started = true;
@@ -195,6 +196,23 @@ class Game {
 		}
 	}
 
+  win(player){
+    
+    //this.winners.set(player, points);
+			this.say("Congratulations to **" + player + "** for winning " + this.name + " game!!");
+      //this.addBits(50, user);
+      this.end();
+			return;
+  }
+  
+  
+  winUser(numBits, player) {
+    this.say("Congratulations to **" + player + "** for winning " + this.name + " game!!");
+		player.say("You were awarded " + numBits + " bits for winning the game! You can use the command ``" + Config.commandCharacter + "bits`` to check your bits.");
+		Games.addBits(numBits, player.name); // eslint-disable-line no-use-before-define
+	}
+  
+  
 	forceEnd() {
 		if (this.ended) return;
 		if (this.timeout) clearTimeout(this.timeout);
@@ -237,6 +255,18 @@ class Game {
 			this.playerCount--;
 		}
 	}
+  
+  
+  elim(player) {
+		if (!(player in this.players) || this.players[player].eliminated) return;
+		if (this.started) {
+			this.players[player].eliminated = true;
+		} else {
+			delete this.players[player];
+			this.playerCount--;
+		}
+	}
+  
 
 	/**
 	 * @param {User} user
@@ -258,7 +288,19 @@ class Game {
 	/**
 	 * @param {User} user
 	 */
+  
+  pl() {
+		let players = [];
+		for (let userID in this.players) {
+			if (this.players[userID].eliminated) continue;
+			players.push(this.players[userID].name);
+		}
+		this.room.say("**Players (" + this.getRemainingPlayerCount() + ")**: " + players.join(", "));
+	}
+  
+  
 	join(user) {
+    
 		if (user.id in this.players) return;
 		if (this.freeJoin) return user.say(this.name + " does not require you to join.");
 		let lateJoin = false;
@@ -321,9 +363,9 @@ class Game {
 		if (!players) players = this.players;
 		let names = [];
 		for (let i in players) {
-			names.push(players[i].name);
+			names.push(players[i].id);
 		}
-		return names.join(", ");
+		return names.join(",");
 	}
 
 	/**
@@ -403,6 +445,19 @@ class Game {
 		}
 		return false;
 	}
+  
+  
+  givepts(uid, pts) {
+    var player = this.players[uid];
+  let points = this.points.get(player) || 0;
+    points = points + pts;
+  this.points.set(player, points);
+		if (points >= this.maxPoints) {
+			this.win(uid);
+		}
+  
+  }
+  
 
 	/**
 	 * @param {string} guess
@@ -433,14 +488,13 @@ class Game {
 		}
 		this.points.set(player, points);
 		if (points >= this.maxPoints) {
-			this.winners.set(player, points);
-			this.say("Correct! " + user.name + " wins the game! (Answer" + (this.answers.length > 1 ? "s" : "") + ": __" + this.answers.join(", ") + "__)");
-			this.end();
-			return;
+			this.winUser(50, user);
 		}
+    if(this.ended !== true){
 		this.say("Correct! " + user.name + " advances to " + points + " point" + (points > 1 ? "s" : "") + ". (Answer" + (this.answers.length > 1 ? "s" : "") + ": __" + this.answers.join(", ") + "__)");
 		this.answers = [];
 		this.timeout = setTimeout(() => this.nextRound(), 5 * 1000);
+    }
 	}
 }
 
