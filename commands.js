@@ -63,6 +63,20 @@ let commands = {
 		Storage.exportDatabase('global');
 		this.say("Your message has been sent to " + Users.add(targets[0]).name + "!");
 	},
+	
+	 timer: function (target, room, user) {
+		if (!user.hasRank(room, '+') && (!Games.host || Games.host.id !== user.id)) return;
+		let x = Math.floor(target);
+		if (!x || x >= 120 || (x < 10 && x > 2) || x <= 0) return room.say("The timer must be between 10 seconds and 2 minutes.");
+		if (x === 1) x = 60;
+		let minutes = Math.floor(x / 60);
+		let seconds = x % 60;
+		clearTimeout(Games.timeout);
+		this.say("Timer set for " + (minutes > 0 ? "1 minute" + (seconds > 0 ? " and " : "") : "") + (seconds > 0 ? ((seconds) + " second" + (seconds > 1 ? "s" : "")) : "") + ".");
+		setTimeout(() => this.say("Times Up!"), x * 1000);
+	},
+	
+	
 
 	// Game commands
 	signups: 'creategame',
@@ -92,6 +106,16 @@ let commands = {
 		room.game.playerCap = cap;
 		this.say("The game will automatically start at **" + cap + "** players!");
 	},
+	
+	mp: 'maxpoints',
+	maxpoints: function (target, room, user) {
+		if (room instanceof Users.User || !room.game || !user.hasRank(room, '+')) return;
+		let mp = parseInt(target);
+		if (isNaN(mp)) return this.say("Please enter a valid value.");
+		room.game.maxPoints = mp;
+		this.say("Player with **" + mp + "** points wins the game!");
+	},
+	
 	end: 'endgame',
 	endgame: function (target, room, user) {
 		if (!(room instanceof Users.User) && !user.hasRank(room, '+')) return;
@@ -107,6 +131,13 @@ let commands = {
 		if (room instanceof Users.User || !room.game) return;
 		room.game.leave(user);
 	},
+	
+	elim: 'eliminate',
+	eliminate: function (target, room, user) {
+		if (room instanceof Users.User || !room.game || !user.hasRank(room, '@')) return;
+		room.game.elim(target);
+	},
+	
 
 	// Storage commands
 	bits: 'points',
@@ -122,6 +153,48 @@ let commands = {
 		if (!points.length) return this.say((target ? target.trim() + " does not" : "You do not") + " have points on any leaderboard.");
 		this.say(points.join(" | "));
 	},
+	
+	choose: function (target, room, user) {
+		for (room in Rooms.rooms) {
+			let realRoom = Rooms.rooms[room];
+			if (realRoom.game && typeof realRoom.game.choose === 'function') realRoom.game.choose(user, target);
+		}
+	},
+
+	suspect: function (target, room, user) {
+		if (room.name !== user.name) return;
+		let firstComma = target.indexOf(',');
+		if (firstComma === -1) {
+			user.say("The correct syntax is " + Config.commandCharacter + "suspect user, pokemon, room");
+			return;
+		}
+		let userID = target.substr(0, firstComma);
+		target = target.substr(firstComma + 1);
+		if (target.charAt(0) === ' ') {
+			target = target.substr(1);
+		}
+		for (room in Rooms.rooms) {
+			let realRoom = Rooms.rooms[room];
+			if (realRoom.game && typeof realRoom.game.suspect === 'function') realRoom.game.suspect(user, userID, target);
+		}
+	},
+	
+	steal: function (target, room, user) {
+		if (!room.game) return;
+		if (typeof room.game.steal === 'function') room.game.steal(target, user);
+	},
+	
+	count: function (target, room, user) {
+		if (!room.game) {
+			if (!user.hasRank(room, '+') || Tools.toId(target) !== "start") {
+				return;
+			}
+			Games.createGame("count", room)
+		} else if (typeof room.game.count === 'function') {
+			room.game.count(target,user);
+		}
+	},
+	
 
 	// Tournament commands
 	tour: 'tournament',
